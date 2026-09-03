@@ -219,6 +219,37 @@ const api = {
   },
   removeTranscriptionClearedListener: () => {
     ipcRenderer.removeAllListeners('transcription-cleared')
+  },
+
+  // ---- 远程双设备模式：出站 WS（server-link）----
+  // 测试连接与正式连接是同一条：startServerLink 后收到 auth_ok 即进入远程模式
+  startServerLink: (config: { url: string; token: string }) =>
+    ipcRenderer.invoke('startServerLink', config) as Promise<{
+      status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+      error: string
+    }>,
+  stopServerLink: () =>
+    ipcRenderer.invoke('stopServerLink') as Promise<{
+      status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+      error: string
+    }>,
+  getServerLinkStatus: () =>
+    ipcRenderer.invoke('getServerLinkStatus') as Promise<{
+      status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+      error: string
+    }>,
+  onServerLinkStatus: (
+    callback: (
+      status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error',
+      error: string
+    ) => void
+  ) => {
+    ipcRenderer.on('server-link-status', (_event, status, error) => {
+      callback(status, error)
+    })
+  },
+  removeServerLinkStatusListener: () => {
+    ipcRenderer.removeAllListeners('server-link-status')
   }
 }
 
