@@ -38,10 +38,11 @@ function applyRunModeWindowProfile(runMode: '' | 'local' | 'remote'): void {
   if (!win || win.isDestroyed()) return
 
   if (runMode === 'remote') {
-    if (is.dev && process.env.ELECTRON_RENDERER_URL) {
-      // dev 豁免：仅 electron-vite dev server 下保留 360×56 状态胶囊便于调试；
-      // 生产包与直接跑 out/ 产物均严格隐身（is.dev 只是 !app.isPackaged，
-      // 未打包跑构建产物时也须隐身，故以 dev server 环境变量为准）
+    if ((is.dev && process.env.ELECTRON_RENDERER_URL) || __DEV_BUILD__) {
+      // dev 豁免：electron-vite dev server 与 CI 调试包（__DEV_BUILD__，build-mac-dev.yml
+      // 出的包）保留 360×56 状态胶囊便于调试；生产包与直接跑 out/ 产物均严格隐身
+      // （is.dev 只是 !app.isPackaged，未打包跑构建产物时也须隐身，故以 dev server
+      // 环境变量为准；打包产物则由 __DEV_BUILD__ 编译期字面量区分）
       win.setAlwaysOnTop(true, 'floating', 1)
       const { workArea } = screen.getPrimaryDisplay()
       const width = 360

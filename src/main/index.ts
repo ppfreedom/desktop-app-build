@@ -72,7 +72,11 @@ app.whenReady().then(() => {
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+    // watchWindowShortcuts 只在未打包（is.dev）时放行 F12/刷新快捷键，打包后的调试包
+    // 也会被它拦截——__DEV_BUILD__ 包跳过注册，保留 F12/Cmd+R 调试能力（生产包不变）
+    if (!__DEV_BUILD__) {
+      optimizer.watchWindowShortcuts(window)
+    }
   })
 
   createWindow()
