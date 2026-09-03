@@ -250,6 +250,15 @@ const api = {
   },
   removeServerLinkStatusListener: () => {
     ipcRenderer.removeAllListeners('server-link-status')
+  },
+  // 最近一次远程截图的诊断 meta（主进程广播，dev 胶囊显示；生产包窗口隐藏不可见）
+  onScreenshotMeta: (callback: (meta: { summary: string }) => void) => {
+    ipcRenderer.on('screenshot-meta', (_event, meta) => {
+      callback(meta)
+    })
+  },
+  removeScreenshotMetaListener: () => {
+    ipcRenderer.removeAllListeners('screenshot-meta')
   }
 }
 

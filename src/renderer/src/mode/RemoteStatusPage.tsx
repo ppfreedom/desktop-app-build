@@ -16,13 +16,19 @@ const STATUS_VIEW: Record<string, { icon: React.ReactNode; title: string }> = {
 }
 
 export default function RemoteStatusPage() {
-  const { serverStatus, serverError } = useRunModeStore()
+  const { serverStatus, serverError, screenshotMetaSummary } = useRunModeStore()
 
   useEffect(() => {
-    const { setServerStatus: apply } = useRunModeStore.getState()
+    const { setServerStatus: apply, setScreenshotMetaSummary: applyMeta } =
+      useRunModeStore.getState()
     window.api.getServerLinkStatus().then((s) => apply(s.status, s.error))
     window.api.onServerLinkStatus((status, error) => apply(status, error))
-    return () => window.api.removeServerLinkStatusListener()
+    // 每次远程截图后主进程广播诊断 meta（尺寸/黑帧占比/显示器枚举/权限），胶囊上自报现场
+    window.api.onScreenshotMeta((meta) => applyMeta(meta.summary))
+    return () => {
+      window.api.removeServerLinkStatusListener()
+      window.api.removeScreenshotMetaListener()
+    }
   }, [])
 
   const view = STATUS_VIEW[serverStatus] ?? STATUS_VIEW.idle
@@ -43,6 +49,11 @@ export default function RemoteStatusPage() {
         <span className="font-medium">{view.title}</span>
         {(isError || serverStatus === 'reconnecting') && serverError && (
           <span className="text-white/70">{serverError}</span>
+        )}
+        {screenshotMetaSummary && (
+          <span className="max-w-[220px] truncate text-[10px] text-white/50">
+            · {screenshotMetaSummary}
+          </span>
         )}
       </div>
     </div>

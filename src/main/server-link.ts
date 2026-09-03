@@ -9,7 +9,7 @@
 //   见 App.tsx）；本模块只维护网络 + 指令执行，不碰 AI（key 全在服务端）
 import { app, BrowserWindow, ipcMain } from 'electron'
 import WebSocket from 'ws'
-import { takeScreenshot } from './take-screenshot'
+import { takeScreenshotWithMeta } from './take-screenshot'
 import { devLog } from './dev-log'
 
 export type ServerLinkStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'
@@ -129,7 +129,7 @@ function connect(): void {
   })
 }
 
-/** 执行服务端指令：目前仅 screenshot，回传同一 id 的 result/error */
+/** 执行服务端指令：目前仅 screenshot，回传同一 id 的 result/error（image + 诊断 meta）*/
 async function handleCommand(id: string, method: string): Promise<void> {
   if (method !== 'screenshot') {
     ws?.send(JSON.stringify({ id, error: { code: 'UNSUPPORTED', message: `未知指令：${method}` } }))
@@ -138,10 +138,17 @@ async function handleCommand(id: string, method: string): Promise<void> {
   try {
     devLog('cmd', `screenshot start id=${id}`)
     const startedAt = Date.now()
-    const image = await takeScreenshot()
-    if (!image) throw new Error('截图失败：无屏幕源')
-    devLog('cmd', `screenshot ok id=${id} bytes=${image.length} took=${Date.now() - startedAt}ms`)
-    ws?.send(JSON.stringify({ id, result: { image } }))
+    const shot = await takeScreenshotWithMeta()
+    if (!shot) throw new Error('截图失败：无屏幕源')
+    devLog(
+      'cmd',
+      `screenshot ok id=${id} bytes=${shot.image.length} took=${Date.now() - startedAt}ms ${shot.meta.summary}`
+    )
+    // 诊断 meta 广播到所有窗口（dev 胶囊显示；生产包窗口隐藏，send 无害）
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('screenshot-meta', shot.meta)
+    }
+    ws?.send(JSON.stringify({ id, result: { image: shot.image, meta: shot.meta } }))
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     devLog('cmd', `screenshot fail id=${id} error=${message}`)

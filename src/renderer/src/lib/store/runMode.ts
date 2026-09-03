@@ -17,9 +17,12 @@ interface RunModeState {
   /** 服务端连接状态（运行时，来自主进程广播，不持久化）*/
   serverStatus: ServerLinkStatus
   serverError: string
+  /** 最近一次远程截图诊断摘要（运行时，主进程随 screenshot-meta 广播，dev 胶囊显示）*/
+  screenshotMetaSummary: string
   selectMode: (mode: RunMode) => void
   setServerConfig: (config: { serverUrl: string; token: string }) => void
   setServerStatus: (status: ServerLinkStatus, error: string) => void
+  setScreenshotMetaSummary: (screenshotMetaSummary: string) => void
   /** 断开连接并回到未选择状态（模式选择页）*/
   resetMode: () => void
 }
@@ -32,9 +35,11 @@ export const useRunModeStore = create<RunModeState>()(
       token: '',
       serverStatus: 'idle',
       serverError: '',
+      screenshotMetaSummary: '',
       selectMode: (mode) => set({ mode }),
       setServerConfig: ({ serverUrl, token }) => set({ serverUrl, token }),
       setServerStatus: (serverStatus, serverError) => set({ serverStatus, serverError }),
+      setScreenshotMetaSummary: (screenshotMetaSummary) => set({ screenshotMetaSummary }),
       resetMode: () => set({ mode: '', serverStatus: 'idle', serverError: '' })
     }),
     {
