@@ -88,6 +88,12 @@ const isToolbarWindow = window.location.hash.startsWith('#toolbar')
 
 function RunModeGate({ children }: { children: React.ReactNode }) {
   const mode = useRunModeStore((state) => state.mode)
+
+  useEffect(() => {
+    // 主进程按模式调整窗口形态（层级/尺寸/Dock，见 main/state.ts applyRunModeWindowProfile）
+    if (!isToolbarWindow) void window.api.updateAppState({ runMode: mode })
+  }, [mode])
+
   if (isToolbarWindow) return <>{children}</>
   if (mode === '') return <ModeSelectPage />
   if (mode === 'remote') return <RemoteStatusPage />
