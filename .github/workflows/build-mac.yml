@@ -16,11 +16,11 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -31,7 +31,7 @@ jobs:
         run: ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci
 
       - name: Cache Electron binaries
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/Library/Caches/electron
@@ -79,7 +79,7 @@ jobs:
           grep -q cdhash /tmp/dr.txt && { echo "::error::DR 含 cdhash（未用证书签名），TCC 授权将失效"; exit 1; } || echo "签名身份稳定（证书锚定）"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mac-arm64
           path: dist/*.zip
