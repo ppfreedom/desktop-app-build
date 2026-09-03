@@ -34,6 +34,7 @@ import './server-link'
 import { createWindow } from './main-window'
 import { initAutoUpdater } from './auto-updater'
 import { applyDockVisibility } from './settings'
+import { state } from './state'
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -82,6 +83,11 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
+    // 远程模式全隐身（state.ts applyRunModeWindowProfile）：activate（如 Finder
+    // 重开 app）不得把隐藏的主窗口拉回屏幕，否则隐身被打破。
+    if (state.runMode === 'remote') {
+      return
+    }
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
     } else if (global.mainWindow && !global.mainWindow.isVisible()) {
