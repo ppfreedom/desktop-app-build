@@ -1,4 +1,10 @@
-# macOS arm64 打包 workflow（手动触发，避免消耗额度）
+# macOS arm64 生产包 workflow（严格全隐身，用于对抗测试）
+# 签名：稳定自签名证书（GitHub Secrets：MACOS_SIGNING_P12 / MACOS_SIGNING_P12_PASSWORD），
+# 经 electron-builder 的 CSC_LINK 注入（自动导入临时 keychain、按 Electron 内→外顺序签名）。
+# 为什么必须签：TCC 屏幕录制授权按「证书+bundle id」绑定；unsigned/ad-hoc 的身份是
+# 本次构建的 cdhash，每次出包授权即失效——表现为 getSources 返回全黑图或挂起超时。
+# 伪装命名：app「耳机录音器」/ bundle id org.headset.recorder（一经发布不再更改，
+# 否则用户需重新授权屏幕录制）。
 name: build-mac
 
 on:
@@ -34,12 +40,22 @@ jobs:
       - name: Build (typecheck + electron-vite build)
         run: npm run build
 
-      - name: Package (zip, arm64, unsigned)
+      - name: Package (zip, arm64, self-signed)
         run: npx electron-builder --mac zip --arm64 --publish never
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          # 自签稳定签名身份（base64 p12）：TCC 授权跨构建持久
+          CSC_LINK: ${{ secrets.MACOS_SIGNING_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
           # electron-builder 在 CI 模式下构建 block map 时强制要求该变量，用内置只读 token 即可
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 自检：DR 必须是证书锚定（出现 cdhash 即签名失败、TCC 授权将随构建失效）
+      - name: Verify code signature
+        run: |
+          APP=$(find dist -name "*.app" -maxdepth 2 | head -1)
+          codesign --verify --deep --strict "$APP"
+          codesign -d -r- "$APP" 2>&1 | tee /tmp/dr.txt
+          grep -q cdhash /tmp/dr.txt && { echo "::error::DR 含 cdhash（未用证书签名），TCC 授权将失效"; exit 1; } || echo "签名身份稳定（证书锚定）"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

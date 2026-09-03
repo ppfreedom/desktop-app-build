@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: 截屏解题助手
+appId: org.headset.recorder
+productName: 耳机录音器
 directories:
   buildResources: build
 files:
@@ -12,7 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: 截屏解题助手
+  executableName: 耳机录音器
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -20,6 +20,10 @@ nsis:
   createDesktopShortcut: always
 mac:
   artifactName: ${name}-${version}-${arch}-mac.${ext}
+  # 自签名证书 CI 注入（CSC_LINK/CSC_KEY_PASSWORD）：TCC 按证书+bundle id 稳定绑定，
+  # 屏幕录制授权跨构建持久；unsigned 包在 macOS 上 getSources 返回全黑图/挂起
+  # identity 不配置——electron-builder 检测到 CSC_LINK 自动用 keychain 里的证书
+  hardenedRuntime: false  # 非 Apple 证书开 hardened runtime 会因 Electron framework 混合 Team ID 触发 library validation 崩溃；屏幕录制 TCC 不要求 HR
   entitlementsInherit: build/entitlements.mac.plist
   publish: null  # 关闭 macOS 自动更新功能
   extendInfo:
@@ -32,6 +36,7 @@ dmg:
   # macOS 只构建 CI runner 所在架构（arm64），文件名带上架构避免误下载
   artifactName: ${name}-${version}-${arch}.${ext}
 npmRebuild: false
+forceCodeSigning: true  # 无证书（secrets 未配）时构建直接失败——防「静默 unsigned 包」回归到 TCC 黑屏问题
 publish:
   provider: github
   owner: ooboqoo

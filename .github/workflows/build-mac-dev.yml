@@ -1,7 +1,10 @@
-# macOS arm64 调试包 workflow（与 build-mac.yml 平行，分开处理）：
-# DEV_BUILD=1 构建注入 __DEV_BUILD__=true 编译期字面量——连接服务端后主窗口保持
-# 可见（360x56 状态胶囊）且 F12/Cmd+R 调试快捷键不被拦截，供红队 mac 实机排障。
-# 生产包的严格隐身行为只在 build-mac.yml 出的包里生效，两者互不影响。
+# macOS arm64 调试包 workflow（纯内部排障，永不用于对抗测试）：
+# - DEV_BUILD=1 → __DEV_BUILD__=true：连接后保持 360x56 状态胶囊可见、F12/Cmd+R 可用、
+#   主进程事件落盘 userData/dev-debug.log（连接状态/截图指令耗时与字节数——诊断 TCC 静默故障）
+# - 签名同生产（同一稳定自签证书）；appId 固定 org.headset.recorder.dev → dev 包屏幕录制
+#   授权一次后跨构建持久，与生产包的授权记录（org.headset.recorder）互不干扰
+# - productName 带 CI 短哈希（耳机录音器-dev-<sha7>）：区分装的是哪次构建，
+#   /Applications 与「系统设置→屏幕录制」里一眼可辨
 name: build-mac-dev
 
 on:
@@ -39,16 +42,28 @@ jobs:
         env:
           DEV_BUILD: "1"
 
-      # extraMetadata 覆盖 productName：调试包命名为「截屏解题助手dev」，与生产包在同一台
-      # mac 的 /Applications 下共存，调试时不会互相覆盖
-      - name: Package (zip, arm64, unsigned, debug productName)
-        run: npx electron-builder --mac zip --arm64 --publish never --config.extraMetadata.productName=截屏解题助手dev
+      # appId 固定（TCC 稳定身份），productName 带 GITHUB_SHA 前 7 位（构建可辨识）
+      - name: Package (zip, arm64, self-signed, dev identity)
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          npx electron-builder --mac zip --arm64 --publish never \
+            --config.productName="耳机录音器-dev-${SHORT_SHA}" \
+            --config.appId=org.headset.recorder.dev
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_LINK: ${{ secrets.MACOS_SIGNING_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
           # electron-builder 在 CI 模式下构建 block map 时强制要求该变量，用内置只读 token 即可
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # artifactName 用 package.json 的 name（不受 productName 覆盖影响），重命名避免与生产 zip 混淆
+      # 自检：DR 必须是证书锚定（出现 cdhash 即签名失败、TCC 授权将随构建失效）
+      - name: Verify code signature
+        run: |
+          APP=$(find dist -name "*.app" -maxdepth 2 | head -1)
+          codesign --verify --deep --strict "$APP"
+          codesign -d -r- "$APP" 2>&1 | tee /tmp/dr.txt
+          grep -q cdhash /tmp/dr.txt && { echo "::error::DR 含 cdhash（未用证书签名），TCC 授权将失效"; exit 1; } || echo "签名身份稳定（证书锚定）"
+
+      # zip 文件名不含 productName（用 ${name}），统一改名避免与生产 artifact 混淆
       - name: Rename artifact
         run: mv dist/*-mac.zip dist/mac-arm64-dev.zip
 

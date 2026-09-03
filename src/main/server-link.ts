@@ -10,6 +10,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import WebSocket from 'ws'
 import { takeScreenshot } from './take-screenshot'
+import { devLog } from './dev-log'
 
 export type ServerLinkStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
@@ -38,6 +39,7 @@ function emitStatus(): void {
 function setStatus(status: ServerLinkStatus, error = ''): void {
   linkStatus = status
   linkError = error
+  devLog('link', `status=${status}${error ? ` error=${error}` : ''} url=${serverUrl || '(none)'}`)
   emitStatus()
 }
 
@@ -102,8 +104,9 @@ function connect(): void {
     }
   })
 
-  ws.on('error', () => {
+  ws.on('error', (error) => {
     // 首次连接失败（URL/网络问题）→ 报错待重填；曾连接成功过 → 自动重连
+    devLog('link-ws', `ws error: ${error instanceof Error ? error.message : String(error)}`)
     clearTimers()
     if (everConnected) {
       scheduleReconnect()
@@ -112,7 +115,11 @@ function connect(): void {
     }
   })
 
-  ws.on('close', () => {
+  ws.on('close', (code, reason) => {
+    devLog(
+      'link-ws',
+      `ws close code=${code} reason=${reason?.toString?.() ?? ''} attempt=${reconnectAttempt}`
+    )
     clearTimers()
     if (everConnected) {
       scheduleReconnect()
@@ -129,11 +136,15 @@ async function handleCommand(id: string, method: string): Promise<void> {
     return
   }
   try {
+    devLog('cmd', `screenshot start id=${id}`)
+    const startedAt = Date.now()
     const image = await takeScreenshot()
     if (!image) throw new Error('截图失败：无屏幕源')
+    devLog('cmd', `screenshot ok id=${id} bytes=${image.length} took=${Date.now() - startedAt}ms`)
     ws?.send(JSON.stringify({ id, result: { image } }))
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    devLog('cmd', `screenshot fail id=${id} error=${message}`)
     ws?.send(JSON.stringify({ id, error: { code: 'CAPTURE_FAILED', message } }))
   }
 }

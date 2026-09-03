@@ -35,6 +35,13 @@ import { createWindow } from './main-window'
 import { initAutoUpdater } from './auto-updater'
 import { applyDockVisibility } from './settings'
 import { state } from './state'
+import { devLog } from './dev-log'
+
+// dev 包排障：记录启动环境（打包路径/版本），mac 端联调时确认运行的是哪个构建
+devLog(
+  'app',
+  `startup userData=${app.getPath('userData')} version=${app.getVersion()} packaged=${app.isPackaged}`
+)
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

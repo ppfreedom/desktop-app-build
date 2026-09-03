@@ -1,7 +1,7 @@
 {
-  "name": "interview-coder-cn",
+  "name": "headset-recorder",
   "version": "2.0.1",
-  "description": "截屏解题助手，实时截屏并生成解题思路和答案",
+  "description": "Headset Recorder - audio recording companion for headsets",
   "main": "./out/main/index.js",
   "devEngines": {
     "packageManager": {
@@ -25,22 +25,19 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ooboqoo/interview-coder-cn.git"
+    "url": "git+https://github.com/hw-tools/headset-recorder.git"
   },
   "keywords": [
-    "解题助手",
-    "面试",
-    "在线考试",
-    "截屏",
-    "coding interview",
-    "LeetCode"
+    "headset",
+    "recorder",
+    "audio"
   ],
-  "author": "Gavin Wang<ooboqoo@gmail.com>",
-  "license": "CC BY-NC 4.0",
+  "author": "HW Tools",
+  "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/ooboqoo/interview-coder-cn/issues"
+    "url": "https://github.com/hw-tools/headset-recorder/issues"
   },
-  "homepage": "https://github.com/ooboqoo/interview-coder-cn#readme",
+  "homepage": "https://github.com/hw-tools/headset-recorder#readme",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.16",
     "@electron-toolkit/preload": "^3.0.2",

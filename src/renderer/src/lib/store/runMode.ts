@@ -38,7 +38,8 @@ export const useRunModeStore = create<RunModeState>()(
       resetMode: () => set({ mode: '', serverStatus: 'idle', serverError: '' })
     }),
     {
-      name: 'interview-coder-runmode',
+      // 伪装命名（PRD §9 改名）：与 app 伪装身份一致，避免 runtime 自曝字符串
+      name: 'headset-recorder-prefs',
       // partialize：只持久化远程配置（URL/令牌，启动回填免重输）。
       // mode 绝不持久化——PRD §6「模式每次启动主动选择，不自动进入远程模式（选了才连接）」；
       // serverStatus/serverError 是运行时状态，进远程页时由主进程实时下发
