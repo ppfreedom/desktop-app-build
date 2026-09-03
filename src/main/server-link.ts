@@ -68,8 +68,21 @@ function connect(): void {
   setStatus(reconnectAttempt === 0 ? 'connecting' : 'reconnecting')
 
   ws.on('open', () => {
-    // 首消息鉴权；服务端 3s 未收到/错误即关闭连接
-    ws?.send(JSON.stringify({ type: 'auth', token: currentToken }))
+    // 首消息鉴权；服务端 3s 未收到/错误即关闭连接。
+    // client 字段自报身份：服务端日志/操作台据此分辨连接来源（多客户端互踢排障的
+    // 关键——曾因 Ubuntu 残留旧客户端与 mac dev 包互抢槽位，日志却分不清谁是谁）
+    ws?.send(
+      JSON.stringify({
+        type: 'auth',
+        token: currentToken,
+        client: {
+          app: app.getName(),
+          version: app.getVersion(),
+          platform: process.platform,
+          arch: process.arch
+        }
+      })
+    )
     authTimer = setTimeout(() => {
       ws?.close()
     }, AUTH_TIMEOUT_MS)
@@ -89,6 +102,8 @@ function connect(): void {
       }
       everConnected = true
       reconnectAttempt = 0
+      // 上线即落盘一条身份日志：终端启动可见「谁连上了、什么版本」
+      devLog('link', `已连接并鉴权成功（${app.getName()} v${app.getVersion()}）`)
       setStatus('connected')
       return
     }
