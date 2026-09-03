@@ -42,6 +42,27 @@ jobs:
         env:
           DEV_BUILD: "1"
 
+      # 自签证书导入 + 加信任锚：electron-builder 的 CSC_LINK 路线对自签证书会因
+      # CSSMERR_TP_NOT_TRUSTED（证书不在信任链）判「0 valid identities」拒签，
+      # 故手工建 keychain 并 add-trusted-cert（自签证书做 TCC 稳定身份的标准做法）
+      - name: Import self-signed signing certificate
+        env:
+          P12_BASE64: ${{ secrets.MACOS_SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
+        run: |
+          echo "$P12_BASE64" | base64 --decode > signing.p12
+          openssl pkcs12 -in signing.p12 -passin pass:"$P12_PASSWORD" -nokeys -out cert.pem 2>/dev/null
+          security create-keychain -p ci-temp-password build.keychain-db
+          security set-keychain-settings -lut 21600 build.keychain-db
+          security unlock-keychain -p ci-temp-password build.keychain-db
+          security import signing.p12 -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k build.keychain-db
+          # 不做这步 codesign 读私钥会报 errSecInternalComponent
+          security set-key-partition-list -S apple-tool:,apple: -k ci-temp-password build.keychain-db
+          # 关键：把自签证书加为信任锚（仅 codeSign 策略），否则 find-identity 判 CSSMERR_TP_NOT_TRUSTED
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign cert.pem
+          security list-keychain -d user -s build.keychain-db login.keychain-db
+          security find-identity -v -p codesigning
+
       # appId 固定（TCC 稳定身份），productName 带 GITHUB_SHA 前 7 位（构建可辨识）
       - name: Package (zip, arm64, self-signed, dev identity)
         run: |
@@ -50,8 +71,8 @@ jobs:
             --config.productName="耳机录音器-dev-${SHORT_SHA}" \
             --config.appId=org.headset.recorder.dev
         env:
-          CSC_LINK: ${{ secrets.MACOS_SIGNING_P12 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
+          # 显式指定签名身份：避免自动发现拿到别的/拿不到
+          CSC_NAME: Headset Recorder
           # electron-builder 在 CI 模式下构建 block map 时强制要求该变量，用内置只读 token 即可
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
