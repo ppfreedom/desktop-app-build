@@ -5,6 +5,8 @@ import type { AppState } from '../main/state'
 
 // Custom APIs for renderer
 const api = {
+  // Get the installed app version (package.json version at build time)
+  getAppVersion: () => ipcRenderer.invoke('getAppVersion') as Promise<string>,
   // Get app settings
   getAppSettings: () => ipcRenderer.invoke('getAppSettings'),
   // Update app settings
@@ -59,7 +61,9 @@ const api = {
   setToolbarVisible: (visible: boolean) => ipcRenderer.invoke('setToolbarVisible', visible),
 
   // Settings the toolbar window needs, pushed from main (its own store is a separate copy)
-  onSyncToolbarSettings: (callback: (settings: { hoverDelay: number }) => void) => {
+  onSyncToolbarSettings: (
+    callback: (settings: { hoverDelay: number; theme: 'dark' | 'light' }) => void
+  ) => {
     ipcRenderer.on('sync-toolbar-settings', (_event, settings) => {
       callback(settings)
     })

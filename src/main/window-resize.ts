@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, screen, type Rectangle } from 'electron'
+import { noteToolbarResize } from './toolbar-window'
 
 export type ResizeDirection = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 
@@ -13,7 +14,7 @@ type ResizeState = {
 }
 
 const MIN_WIDTH = 200
-/** Low enough to still allow shrinking the toolbar, high enough to keep its buttons visible */
+/** Only the main window resizes vertically; low enough to leave it a usable header strip */
 const MIN_HEIGHT = 36
 /** Cursor sampling interval while dragging, roughly one frame */
 const POLL_INTERVAL = 16
@@ -64,7 +65,13 @@ function trackCursor(): void {
   if (x === resizeState.lastX && y === resizeState.lastY) return
   resizeState.lastX = x
   resizeState.lastY = y
-  resizeState.window.setBounds(resizeBounds(resizeState, x, y))
+
+  // Every frame is derived from the bounds snapshotted at drag start, so the
+  // rounding of a single getBounds() cannot accumulate. The toolbar is told the
+  // size it ends up with, because its own sync must never read it back.
+  const bounds = resizeBounds(resizeState, x, y)
+  resizeState.window.setBounds(bounds)
+  noteToolbarResize(resizeState.window, bounds.width, bounds.height)
 }
 
 function stopResize(): void {

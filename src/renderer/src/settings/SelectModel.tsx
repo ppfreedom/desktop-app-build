@@ -85,13 +85,15 @@ export function SelectModel({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn('w-60 justify-between', className)}
+          className={cn('w-60 justify-between overflow-hidden', className)}
         >
-          {value ? (models.find((m) => m.value === value)?.label ?? value) : '选择模型...'}
+          <span className="truncate">
+            {value ? (models.find((m) => m.value === value)?.label ?? value) : '选择模型...'}
+          </span>
           <ChevronsUpDown className="opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-60 p-0">
+      <PopoverContent className="w-auto min-w-60 max-w-[26rem] p-0">
         <Command>
           <CommandInput
             placeholder="输入以搜索或创建..."
@@ -111,9 +113,9 @@ export function SelectModel({
                       setSearchValue('')
                       setOpen(false)
                     }}
-                    className="flex-1"
+                    className="flex-1 overflow-hidden"
                   >
-                    {m.label}
+                    <span className="truncate">{m.label}</span>
                     <Check
                       className={cn('ml-auto', value === m.value ? 'opacity-100' : 'opacity-0')}
                     />

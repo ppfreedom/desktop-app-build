@@ -37,6 +37,7 @@ import {
   OPACITY_MAX,
   OPACITY_STEP
 } from '@/lib/store/settings'
+import type { Theme } from '@/lib/theme'
 import { isMac } from '@/lib/utils/env'
 import { SelectModel } from './SelectModel'
 import { CustomShortcuts, ResetDefaultShortcuts } from './CustomShortcuts'
@@ -50,6 +51,7 @@ import {
 
 export default function SettingsPage() {
   const {
+    theme,
     opacity,
     resizable,
     showOverlayToolbar,
@@ -438,6 +440,24 @@ export default function SettingsPage() {
           </h2>
 
           <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">
+                背景主题
+                <span className="ml-2 text-xs font-light">
+                  做题页面为白色背景时选「浅色」，工具会变为白底黑字，不再显眼
+                </span>
+              </label>
+              <Select value={theme} onValueChange={(val) => updateSetting('theme', val as Theme)}>
+                <SelectTrigger className="w-60 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dark">深色（默认）</SelectItem>
+                  <SelectItem value="light">浅色（白底黑字）</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">
                 窗口透明度

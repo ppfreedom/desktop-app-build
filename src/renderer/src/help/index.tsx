@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import {
   ArrowLeft,
@@ -17,6 +18,12 @@ import { OverlayToolbarHelp } from './OverlayToolbar'
 import { FAQ } from './FAQ'
 
 export default function HelpPage() {
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    window.api.getAppVersion().then(setAppVersion)
+  }, [])
+
   return (
     <>
       {/* Header */}
@@ -34,7 +41,7 @@ export default function HelpPage() {
       {/* Help Content */}
       <div id="app-content" className="flex flex-col gap-4 p-8">
         {/* Introduction */}
-        <HelpSection Icon={Info} title="简介">
+        <HelpSection Icon={Info} title="简介" description={appVersion && `当前版本 v${appVersion}`}>
           <p className="text-gray-700">
             欢迎使用截屏解题助手！无论是 编程面试 / 在线考试 还是其他解题场景，
             该工具都可以帮助您快速截图，分析屏幕内容，并给出解答建议。 您可以访问本项目{' '}
