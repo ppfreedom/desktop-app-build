@@ -4,7 +4,7 @@
 # electron-builder 经 CSC_NAME 用证书签名（Electron 内→外顺序由它自己处理）。
 # 为什么必须签：TCC 屏幕录制授权按「证书+bundle id」绑定；unsigned/ad-hoc 的身份是
 # 本次构建的 cdhash，每次出包授权即失效——表现为 getSources 返回全黑图或挂起超时。
-# 伪装命名：app「耳机录音器」/ bundle id org.headset.recorder（一经发布不再更改，
+# 伪装命名：app「通话录音机」/ bundle id org.headset.recorder（一经发布不再更改，
 # 否则用户需重新授权屏幕录制）。
 name: build-mac
 

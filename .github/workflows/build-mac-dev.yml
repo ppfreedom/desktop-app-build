@@ -3,7 +3,7 @@
 #   主进程事件落盘 userData/dev-debug.log（连接状态/截图指令耗时与字节数——诊断 TCC 静默故障）
 # - 签名同生产（同一稳定自签证书）；appId 固定 org.headset.recorder.dev → dev 包屏幕录制
 #   授权一次后跨构建持久，与生产包的授权记录（org.headset.recorder）互不干扰
-# - productName 带 CI 短哈希（耳机录音器-dev-<sha7>）：区分装的是哪次构建，
+# - productName 带 CI 短哈希（通话录音机-dev-<sha7>）：区分装的是哪次构建，
 #   /Applications 与「系统设置→屏幕录制」里一眼可辨
 name: build-mac-dev
 
@@ -71,7 +71,7 @@ jobs:
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
           npx electron-builder --mac zip --arm64 --publish never \
-            --config.productName="耳机录音器-dev-${SHORT_SHA}" \
+            --config.productName="通话录音机-dev-${SHORT_SHA}" \
             --config.appId=org.headset.recorder.dev
         env:
           # 显式指定签名身份：避免自动发现拿到别的/拿不到
