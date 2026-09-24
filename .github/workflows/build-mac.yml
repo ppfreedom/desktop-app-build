@@ -27,8 +27,11 @@ jobs:
           cache-dependency-path: package-lock.json
 
       # 跳过 npm 层的 Electron 二进制下载（本平台是 macOS，electron-builder 会按需下载 darwin-arm64 并被下方缓存命中）
+      # 用 npm install 而非 npm ci：lock 在 Linux 上生成，缺 macOS npm 才要求的 transitive
+      # peer 子树（app-builder-lib → electron-builder-squirrel-windows → archiver…），
+      # npm ci 会报 lock out of sync；install 现场解析，lock 仅作版本基准
       - name: Install dependencies
-        run: ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci
+        run: ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install
 
       - name: Cache Electron binaries
         uses: actions/cache@v6
