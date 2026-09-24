@@ -128,13 +128,7 @@ async function captureScreenshot(): Promise<ScreenshotWithMeta | void> {
   return { image: screenshot.toString('base64'), meta }
 }
 
-/** 本地模式入口（签名保持不变）：返回 base64，无源/失败时 void */
-export async function takeScreenshot(): Promise<string | void> {
-  const result = await captureScreenshot()
-  return result?.image
-}
-
-/** 远程指令入口：base64 + 诊断 meta（服务端黑帧拦截与 dev 胶囊展示依赖它） */
+/** 服务端指令入口：base64 + 诊断 meta（服务端黑帧拦截与 dev 胶囊展示依赖它）。 */
 export function takeScreenshotWithMeta(): Promise<ScreenshotWithMeta | void> {
   return captureScreenshot()
 }

@@ -1,21 +1,21 @@
 // 远程双设备模式的出站 WS 长连接（服务端调用客户端通道）
 // 设计（PRD tasks/服务端指令.md §2/§6 + tasks/远程连接稳定性.md）：
 //   - 客户端不监听端口，只发一条出站连接——出站是唯一网络行为，检测面最小
-//   - 连接后首消息 {"type":"auth","token"} 鉴权，收到 auth_ok 才算测试通过
+//   - 连接后首消息 {"type":"auth","token"} 鉴权，收到 auth_ok 后才进入工作态
 //   - 收 screenshot 指令 → 复用 take-screenshot → 同连接回传 base64（答案不进客户端）
 //   - 客户端主动 ping 心跳：半开连接（NAT 静默超时/吞包）下服务端 terminate 的 RST
 //     可能穿不回本端，只有本端自己 ping 才能在 90s 级别发现死链并重连
 //   - 断线固定区间随机重连（2~6s 均匀分布整数秒）：无累积跳级、序列不可被流量
 //     切片学习（蓝队无法用「重连节奏指纹」刻画客户端）
 //   - close code 4003/4004（令牌被拒/配对码已换）按阶段分流：首连报错待重填（用户
-//     在屏幕前）；运行中静默 app.quit()——回主界面 = show 窗口 = 共享中暴露
-//   - 「从未连接成功过」的失败不重连，由模式选择页引导用户重填（令牌/URL 错重连无意义）
-// 抗检测纪律：不注册任何全局快捷键（远程模式由 renderer 跳过 initShortcuts，
-//   见 App.tsx）；本模块只维护网络 + 指令执行，不碰 AI（key 全在服务端）
+//     在屏幕前）；运行中静默 app.quit()——重新显示配置页会使屏幕上的窗口突然出现
+//   - 「从未连接成功过」的失败不重连，由启动配置页引导用户重填（令牌/URL 错重连无意义）
+// 本客户端不注册全局快捷键；本模块只维护网络 + 指令执行，不碰 AI（key 全在服务端）
 import { app, BrowserWindow, ipcMain } from 'electron'
 import WebSocket from 'ws'
 import { takeScreenshotWithMeta } from './take-screenshot'
 import { devLog } from './dev-log'
+import { enterConnectedMode } from './main-window'
 
 export type ServerLinkStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
@@ -157,6 +157,7 @@ function connect(): void {
       // 上线即落盘一条身份日志：终端启动可见「谁连上了、什么版本」
       devLog('link', `已连接并鉴权成功（${app.getName()} v${app.getVersion()}）`)
       setStatus('connected')
+      enterConnectedMode()
       return
     }
     // 服务端指令（id + method，回传同 id 的 result/error）；params 暂不使用（预留多屏等扩展）
@@ -177,8 +178,8 @@ function connect(): void {
     clearTimers()
 
     // 令牌/配对码类终局错误分流（PRD §2.2）：
-    //   首连阶段 → 报错待重填（用户还在屏幕前，选择页可见不构成暴露）
-    //   运行中   → 静默退出：主窗口已 hidden，回选择页 = show = 共享中弹窗暴露，
+    //   首连阶段 → 报错待重填（用户还在屏幕前，配置页可见）
+    //   运行中   → 静默退出：主窗口已 hidden，回配置页 = show = 共享中弹窗暴露，
     //              app.quit() 是唯一零暴露出路；will-quit → stopServerLink 已挂好
     if (code === CLOSE_AUTH_FAILED || code === CLOSE_PAIRING_ROTATED) {
       if (everConnected) {
@@ -214,9 +215,11 @@ async function handleCommand(id: string, method: string): Promise<void> {
       'cmd',
       `screenshot ok id=${id} bytes=${shot.image.length} took=${Date.now() - startedAt}ms ${shot.meta.summary}`
     )
-    // 诊断 meta 广播到所有窗口（dev 胶囊显示；生产包窗口隐藏，send 无害）
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('screenshot-meta', shot.meta)
+    // 诊断 meta 只在调试包推给胶囊；生产包无本地答案或状态窗口。
+    if (__DEV_BUILD__) {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('screenshot-meta', shot.meta)
+      }
     }
     ws?.send(JSON.stringify({ id, result: { image: shot.image, meta: shot.meta } }))
   } catch (error) {
@@ -226,7 +229,7 @@ async function handleCommand(id: string, method: string): Promise<void> {
   }
 }
 
-/** 建立（或重建）连接。测试连接与正式连接是同一条：auth_ok 即保持进入远程模式 */
+/** 建立（或重建）连接；auth_ok 后保持原连接运行。 */
 export function startServerLink(config: { url: string; token: string }): ServerLinkStatus {
   const url = config.url.trim()
   const token = config.token.trim()
@@ -242,7 +245,7 @@ export function startServerLink(config: { url: string; token: string }): ServerL
   return linkStatus
 }
 
-/** 主动断开（退出应用 / 用户返回重选模式）*/
+/** 退出应用时关闭长连接和定时器。 */
 export function stopServerLink(): void {
   clearTimers()
   if (ws) {

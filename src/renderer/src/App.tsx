@@ -1,131 +1,101 @@
 import { useEffect, useState } from 'react'
-import { HashRouter, Routes, Route, useLocation } from 'react-router'
-import { Toaster } from 'sonner'
-import CoderPage from '@/coder'
-import SettingsPage from '@/settings'
-import HelpPage from '@/help'
-import { OverlayToolbar } from '@/coder/OverlayToolbar'
-import { useSettingsStore } from '@/lib/store/settings'
-import { useShortcutsStore } from '@/lib/store/shortcuts'
-import { useRunModeStore } from '@/lib/store/runMode'
-import { getCloneableFields } from '@/lib/utils'
-import { applyTheme } from '@/lib/theme'
-import { WindowResizeHandles } from '@/components/WindowResizeHandles'
-import ModeSelectPage from '@/mode/ModeSelectPage'
-import RemoteStatusPage from '@/mode/RemoteStatusPage'
+import { useConnectionStore } from './lib/store/connection'
 
 export default function App() {
-  const [initialized, setInitialized] = useState(false)
-  const settingsStore = useSettingsStore()
-  const { shortcuts } = useShortcutsStore()
-  const theme = useSettingsStore((state) => state.theme)
+  const {
+    serverUrl,
+    token,
+    status,
+    error,
+    screenshotMetaSummary,
+    setConfig,
+    setStatus,
+    setScreenshotMetaSummary
+  } = useConnectionStore()
+  const [inputUrl, setInputUrl] = useState(serverUrl)
+  const [inputToken, setInputToken] = useState(token)
+  const connected = status === 'connected' || status === 'reconnecting'
 
-  // Paint the window before syncing with main, so the first frame already uses
-  // the persisted theme; the toolbar window gets the live value pushed to it.
   useEffect(() => {
-    applyTheme(theme)
-  }, [theme])
-
-  useEffect(() => {
-    window.api.getAppSettings().then((settings) => {
-      const blankFields = Object.keys(settings).filter(
-        (key) => settings[key] && !settingsStore[key]
-      )
-      settingsStore.syncSettings(
-        blankFields.reduce(
-          (acc, key) => {
-            acc[key] = settings[key]
-            return acc
-          },
-          {} as Partial<typeof settingsStore>
-        )
-      )
-      setInitialized(true)
+    // Zustand 的持久化配置可能晚于 React 首次渲染完成, 保持表单回填与保存值一致。
+    const unsubscribe = useConnectionStore.persist.onFinishHydration((state) => {
+      setInputUrl(state.serverUrl)
+      setInputToken(state.token)
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (useConnectionStore.persist.hasHydrated()) {
+      const state = useConnectionStore.getState()
+      setInputUrl(state.serverUrl)
+      setInputToken(state.token)
+    }
+    return unsubscribe
   }, [])
 
   useEffect(() => {
-    if (initialized) {
-      window.api.updateAppSettings(getCloneableFields(settingsStore))
+    void window.api.getServerLinkStatus().then(({ status, error }) => setStatus(status, error))
+    window.api.onServerLinkStatus((status, error) => setStatus(status, error))
+    window.api.onScreenshotMeta(({ summary }) => setScreenshotMetaSummary(summary))
+    return () => {
+      window.api.removeServerLinkStatusListener()
+      window.api.removeScreenshotMetaListener()
     }
-  }, [initialized, settingsStore])
+  }, [setStatus, setScreenshotMetaSummary])
 
-  const mode = useRunModeStore((state) => state.mode)
+  const connect = async () => {
+    const url = inputUrl.trim()
+    const nextToken = inputToken.trim()
+    if (!url || !nextToken) {
+      setStatus('error', '服务端 URL 与配对令牌均必填')
+      return
+    }
+    setConfig({ serverUrl: url, token: nextToken })
+    setStatus('connecting', '')
+    try {
+      const result = await window.api.startServerLink({ url, token: nextToken })
+      if (result.error) setStatus(result.status, result.error)
+    } catch (error) {
+      setStatus('error', error instanceof Error ? error.message : String(error))
+    }
+  }
 
-  useEffect(() => {
-    // 远程双设备模式不注册全局快捷键（蓝队有键盘监听：本地热键留下「截屏前的异常组合键」
-    // 记录；且系统级热键注册本身是足迹，还会与监考软件抢注组合键）。本地模式不受影响。
-    if (mode !== 'local') return
-    console.log('App initShortcuts:', shortcuts) // DEBUG: 检查新键
-    window.api.initShortcuts(shortcuts)
-    window.api.getShortcuts().then((shortcutsStatus) => {
-      console.log('Shortcuts registered:', shortcutsStatus) // DEBUG: 主进程状态
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode])
+  if (connected) {
+    return (
+      <div className="capsule-drag">
+        <span
+          className={status === 'connected' ? 'status-indicator' : 'status-indicator waiting'}
+        />
+        <span>{status === 'connected' ? '已连接' : '重连中'}</span>
+        {status === 'reconnecting' && error && <span className="status-detail">{error}</span>}
+        {screenshotMetaSummary && <span className="status-detail">· {screenshotMetaSummary}</span>}
+      </div>
+    )
+  }
 
   return (
-    <>
-      {/* 启动模式门：未选择强制选模式；远程双设备只出连接状态页（答案在服务端操作台）*/}
-      <RunModeGate>
-        <HashRouter>
-          <ToolbarVisibilityController />
-          <WindowResizeController />
-          <Routes>
-            <Route index element={<CoderPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="help" element={<HelpPage />} />
-            <Route path="toolbar" element={<OverlayToolbar />} />
-          </Routes>
-        </HashRouter>
-      </RunModeGate>
-
-      <Toaster />
-    </>
+    <div className="setup-page">
+      <header className="titlebar">耳机录音器</header>
+      <main className="setup-content">
+        <h1>连接服务端</h1>
+        <p>每次启动需手动连接；配置已保存，下次启动自动回填。</p>
+        <label htmlFor="server-url">服务端 URL</label>
+        <input
+          id="server-url"
+          value={inputUrl}
+          onChange={(event) => setInputUrl(event.target.value)}
+          placeholder="ws://x.x.x.x:9109/client"
+        />
+        <label htmlFor="pairing-token">配对令牌</label>
+        <input
+          id="pairing-token"
+          type="password"
+          value={inputToken}
+          onChange={(event) => setInputToken(event.target.value)}
+          placeholder="配对令牌"
+        />
+        <button type="button" onClick={connect} disabled={status === 'connecting'}>
+          {status === 'connecting' ? '连接中…' : '连接服务端'}
+        </button>
+        {status === 'error' && <p className="error-message">{error || '连接失败'}</p>}
+      </main>
+    </div>
   )
-}
-
-/**
- * 按运行模式分流首屏：''→选择页，remote→远程状态页，local→原应用界面。
- * 工具条窗口（#toolbar hash 加载）跳过模式门：它是主窗口的附属（本地模式鼠标触发用），
- * 其 store 是独立副本却共用同一 localStorage key——若也挂模式门，其 ModeSelectPage 会
- * 监听连接状态广播并把主窗口持久化的 serverUrl/token 用空值覆写掉（跨窗口 persist 互踩）。
- */
-const isToolbarWindow = window.location.hash.startsWith('#toolbar')
-
-function RunModeGate({ children }: { children: React.ReactNode }) {
-  const mode = useRunModeStore((state) => state.mode)
-
-  useEffect(() => {
-    // 主进程按模式调整窗口形态（层级/尺寸/Dock，见 main/state.ts applyRunModeWindowProfile）
-    if (!isToolbarWindow) void window.api.updateAppState({ runMode: mode })
-  }, [mode])
-
-  if (isToolbarWindow) return <>{children}</>
-  if (mode === '') return <ModeSelectPage />
-  if (mode === 'remote') return <RemoteStatusPage />
-  return <>{children}</>
-}
-
-/** The toolbar window renders its own handles; this covers the main window's routes */
-function WindowResizeController() {
-  const location = useLocation()
-  const resizable = useSettingsStore((state) => state.resizable)
-
-  if (location.pathname === '/toolbar') return null
-  return <WindowResizeHandles enabled={resizable} />
-}
-
-function ToolbarVisibilityController() {
-  const location = useLocation()
-  const showOverlayToolbar = useSettingsStore((state) => state.showOverlayToolbar)
-
-  useEffect(() => {
-    // The toolbar window renders this app too, but must not drive its own visibility
-    if (location.pathname === '/toolbar') return
-    void window.api.setToolbarVisible(location.pathname === '/' && showOverlayToolbar)
-  }, [location.pathname, showOverlayToolbar])
-
-  return null
 }
